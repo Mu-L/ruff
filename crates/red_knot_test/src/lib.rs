@@ -1,15 +1,20 @@
+use crate::config::Log;
+use camino::Utf8Path;
 use colored::Colorize;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
+use red_knot_python_semantic::Program;
 use ruff_db::diagnostic::{Diagnostic, ParseDiagnostic};
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_source_file::LineIndex;
 use ruff_text_size::TextSize;
-use std::path::Path;
+use salsa::Setter;
 
 mod assertion;
+mod config;
 mod db;
 mod diagnostic;
 mod matcher;
@@ -21,12 +26,12 @@ const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
 ///
 /// Panic on test failure, and print failure details.
 #[allow(clippy::print_stdout)]
-pub fn run(path: &Path, long_title: &str, short_title: &str) {
+pub fn run(path: &Utf8Path, long_title: &str, short_title: &str, test_name: &str) {
     let source = std::fs::read_to_string(path).unwrap();
     let suite = match test_parser::parse(short_title, &source) {
         Ok(suite) => suite,
         Err(err) => {
-            panic!("Error parsing `{}`: {err}", path.to_str().unwrap())
+            panic!("Error parsing `{path}`: {err:?}")
         }
     };
 
@@ -38,6 +43,15 @@ pub fn run(path: &Path, long_title: &str, short_title: &str) {
         if filter.as_ref().is_some_and(|f| !test.name().contains(f)) {
             continue;
         }
+
+        let _tracing = test.configuration().log.as_ref().and_then(|log| match log {
+            Log::Bool(enabled) => enabled.then(setup_logging),
+            Log::Filter(filter) => setup_logging_with_filter(filter),
+        });
+
+        Program::get(&db)
+            .set_python_version(&mut db)
+            .to(test.configuration().python_version().unwrap_or_default());
 
         // Remove all files so that the db is in a "fresh" state.
         db.memory_file_system().remove_all();
@@ -67,7 +81,7 @@ pub fn run(path: &Path, long_title: &str, short_title: &str) {
                 test.name()
             );
             println!(
-                "{MDTEST_TEST_FILTER}=\"{}\" cargo test -p red_knot_python_semantic --test mdtest",
+                "{MDTEST_TEST_FILTER}=\"{}\" cargo test -p red_knot_python_semantic --test mdtest -- {test_name}",
                 test.name()
             );
         }

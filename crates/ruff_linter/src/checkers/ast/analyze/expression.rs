@@ -220,6 +220,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     if checker.enabled(Rule::RegexFlagAlias) {
                         refurb::rules::regex_flag_alias(checker, expr);
                     }
+                    if checker.enabled(Rule::Airflow3Removal) {
+                        airflow::rules::removed_in_3(checker, expr);
+                    }
+                    if checker.enabled(Rule::Airflow3MovedToProvider) {
+                        airflow::rules::moved_to_provider_in_3(checker, expr);
+                    }
 
                     // Ex) List[...]
                     if checker.any_enabled(&[
@@ -379,6 +385,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ByteStringUsage) {
                 flake8_pyi::rules::bytestring_attribute(checker, expr);
+            }
+            if checker.enabled(Rule::Airflow3Removal) {
+                airflow::rules::removed_in_3(checker, expr);
             }
         }
         Expr::Call(
@@ -1083,6 +1092,21 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::UnnecessaryRegularExpression) {
                 ruff::rules::unnecessary_regular_expression(checker, call);
+            }
+            if checker.enabled(Rule::Airflow3Removal) {
+                airflow::rules::removed_in_3(checker, expr);
+            }
+            if checker.enabled(Rule::UnnecessaryCastToInt) {
+                ruff::rules::unnecessary_cast_to_int(checker, call);
+            }
+            if checker.enabled(Rule::InvalidPathlibWithSuffix) {
+                flake8_use_pathlib::rules::invalid_pathlib_with_suffix(checker, call);
+            }
+            if checker.enabled(Rule::BatchedWithoutExplicitStrict) {
+                flake8_bugbear::rules::batched_without_explicit_strict(checker, call);
+            }
+            if checker.enabled(Rule::PytestRaisesAmbiguousPattern) {
+                ruff::rules::pytest_raises_ambiguous_pattern(checker, call);
             }
         }
         Expr::Dict(dict) => {
